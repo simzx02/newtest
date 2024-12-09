@@ -1,5 +1,3 @@
-//capstone code for esp32//
-
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>     // if you don´t have I2C version of the display, use LiquidCrystal.h library instead
 
@@ -14,15 +12,16 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define STATUS_LED1 25
 #define STATUS_LED2 33
 #define STATUS_LED3 32
-#define POWER_SWITCH 14
 #define RESET_BUTTON 27
 #define PUMP 5
 #define PNEUMATIC_PC1 17
 #define PNEUMATIC_PC2 16
 
+int complete = 0;
+
 void setup() {
   // Initialize serial communication for debugging
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   // Set pin modes
   pinMode(PC1_1, INPUT_PULLUP);//Limit switches
@@ -38,6 +37,11 @@ void setup() {
   pinMode(PUMP, OUTPUT);
   pinMode(PNEUMATIC_PC1, OUTPUT); // Pneumatic 1
   pinMode(PNEUMATIC_PC2, OUTPUT); // Pnumatic 2
+
+  //Initialize Pump and Pneumatic signal
+  digitalWrite(PUMP, LOW);
+  digitalWrite(PNEUMATIC_PC1,LOW);
+  digitalWrite(PNEUMATIC_PC2,LOW);
 
    // Initialize LCD
   lcd.init();
@@ -86,8 +90,10 @@ void loop() {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Processing:");
+      delay(1000);
       lcd.setCursor(0, 1);
       lcd.print("Station 1-->2");
+      delay(1000);
       digitalWrite(STATUS_LED1, HIGH);
       digitalWrite(PNEUMATIC_PC1, HIGH);
       
@@ -102,20 +108,20 @@ void loop() {
     return;
   }
   // Station 2: Dispensing
-  printCurrentStation(2); //Print out>> Current Station: Station 2
+  //printCurrentStation(2); //Print out>> Current Station: Station 2
   //digitalWrite(STATUS_LED2, HIGH);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Station 2");
   delay(2000);
-  /*
+  
   while (true) {
     if (digitalRead(RESET_BUTTON) == LOW) {
       Reset();
       return;
     }
     if (digitalRead(PC1_2) == HIGH) {
-      if (needsDispensing()) {
+      if (needsDispensing() && digitalRead(PC1_2) == HIGH) {
         dispenseWater();
       } else {
         lcd.setCursor(0, 1);
@@ -126,11 +132,14 @@ void loop() {
       lcd.print("Processing:");
       lcd.setCursor(0, 1);
       lcd.print("Station 2-->3");
+      delay(3000);
 
       moveToStation3();
       digitalWrite(STATUS_LED2, LOW);
       break;
     }
+
+
   }
 
   // Reset
@@ -139,7 +148,7 @@ void loop() {
   }
 
   // Station 3: Process Completion
-  printCurrentStation(3); //Print out>> Current Station: Station 3
+  //printCurrentStation(3); //Print out>> Current Station: Station 3
   while (true) {
     if (digitalRead(RESET_BUTTON) == LOW) {
       Reset();
@@ -151,13 +160,24 @@ void loop() {
     lcd.print("Station 3");
     delay(2000);
 
+
     captureoutput(); //image from raspberrypi
     displayfindings();//finding from image processing
+    complete = 1;
+    break;
   }
   //  reset button press
   if (digitalRead(RESET_BUTTON) == LOW) {
     Reset();
-  }*/
+  }
+  while (complete == 1) {
+    //infinite loop
+    if (digitalRead(RESET_BUTTON) == LOW) {
+    Reset();
+    }
+  }
+  
+  
 }
 
 // Helper functions
@@ -178,27 +198,36 @@ void moveToStation3(){
 
 bool needsDispensing() {
   // Replace this with machine vision result from Raspberry Pi
+
   return true;
 }
 
 void captureoutput() {
   // Replace this with machine vision result from Raspberry Pi
   //pass;
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("capture output");
+  delay(2000);
 }
 
 void displayfindings() {
   // Replace this with machine vision result from Raspberry Pi
   //pass;
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Display outcome");
+  delay(2000);
 }
 
 void dispenseWater() {
-  lcd.clear();
+  //lcd.clear();
   lcd.setCursor(0, 1);
   lcd.print("Dispensing");
   digitalWrite(PNEUMATIC_PC2, HIGH);
-  delay(1000);
+  delay(3000);
   lcd.print(".");
-  if (digitalRead(PC2_2)== HIGH){
+  while (digitalRead(PC2_2)== HIGH){
     digitalWrite(PUMP, HIGH);
     lcd.print(".");
     delay(1000);
@@ -207,13 +236,14 @@ void dispenseWater() {
     digitalWrite(PUMP, LOW);
   }
   digitalWrite(PNEUMATIC_PC2, LOW);
-  lcd.clear();
+  //lcd.clear();
   lcd.setCursor(0, 1);
   lcd.print("Done Dispensing");
-  delay(1000);
+  delay(3000);
 }
 
 void Reset() {
+  complete = 0;
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("System Reset");
@@ -271,4 +301,5 @@ void printCurrentStation(int numstation){//active high for all limit switches
         } 
     break;
   }
+
 }
