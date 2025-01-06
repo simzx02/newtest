@@ -1,0 +1,148 @@
+import paho.mqtt.client as mqtt
+import time
+
+# MQTT Broker Configuration (Ensure IP matches ESP32 setup)
+broker_address = "172.20.10.11"  # Replace with your ESP32 IP
+broker_port = 1883
+username = "alice"
+password = "secret"
+
+# MQTT Topics
+station1_request_topic = "station1/request"
+station1_response_topic = "station1/response"
+station3_request_topic = "station3/request"
+station3_response_topic = "station3/response"
+reset_topic = "reset"
+
+# ✅ Initialize the MQTT Client
+client = mqtt.Client()
+client.username_pw_set(username, password)
+
+# ✅ Global Variables for Reset Control
+reset_triggered = False
+
+
+# ✅ MQTT Callback: Handling Incoming Messages
+def on_message(client, userdata, message):
+    global reset_triggered
+    payload = message.payload.decode("utf-8")
+    print(f"\n📩 Received message from {message.topic}: {payload}")
+
+    # ✅ Reset Handling (From ESP32)
+    if message.topic == reset_topic and payload == "RESET_TRIGGERED":
+        print("⚠️ Reset Triggered from ESP32! Performing reset...")
+        reset_triggered = True
+        send_station1_response()
+
+    # ✅ Station 1 Request Handling
+    elif message.topic == station1_request_topic:
+        print("📩 ESP32 requested manual input for Station 1.")
+        send_station1_response()
+
+    # ✅ Station 3 Request Handling
+    elif message.topic == station3_request_topic:
+        print("📩 ESP32 requested manual input for Station 3.")
+        send_station3_feedback()
+
+
+# ✅ Connect to the MQTT Broker with Automatic Reconnection
+def connect_to_broker():
+    while True:
+        try:
+            client.connect(broker_address, broker_port)
+            print(f"✅ Connected to MQTT broker at {broker_address}")
+            break
+        except Exception as e:
+            print(f"⚠️ Connection failed: {e}. Retrying in 5 seconds...")
+            time.sleep(5)
+
+
+# ✅ Send Manual Input for Station 1 to ESP32
+def send_station1_response():
+    print("\n🌟 Station 1 Response Options:")
+    print("1: No Lens Holder")
+    print("2: Perfect Solution")
+    print("3: No Solution")
+    print("4: Spill Solution")
+
+    messages = {
+        "1": "No Lens Holder",
+        "2": "Perfect Solution",
+        "3": "No Solution",
+        "4": "Spill Solution"
+    }
+
+    while True:
+        choice = input("Enter your choice for Station 1 (1-4): ").strip()
+        if choice in messages:
+            client.publish(station1_response_topic, messages[choice])
+            print(f"✅ Sent: '{messages[choice]}' to ESP32.")
+            break
+        else:
+            print("⚠️ Invalid choice. Please try again.")
+
+
+# ✅ Send Manual Feedback for Station 3 to ESP32
+def send_station3_feedback():
+    print("\n🌟 Station 3 Feedback Options:")
+    print("1: No Lens Holder")
+    print("2: Perfect Solution")
+    print("3: No Solution")
+    print("4: Spill Solution")
+
+    feedback_map = {
+        "1": "No Lens Holder",
+        "2": "Perfect Solution",
+        "3": "No Solution",
+        "4": "Spill Solution"
+    }
+
+    while True:
+        choice = input("Enter feedback for Station 3 (1-4): ").strip()
+        if choice in feedback_map:
+            client.publish(station3_response_topic, feedback_map[choice])
+            print(f"✅ Sent feedback: '{feedback_map[choice]}' to ESP32.")
+            break
+        else:
+            print("⚠️ Invalid choice. Please try again.")
+
+
+# ✅ Manual Reset Trigger from Python Client
+def manual_reset():
+    client.publish(reset_topic, "RESET_TRIGGERED")
+    print("✅ Manual Reset Triggered")
+
+
+# ✅ Main Function to Keep MQTT Client Active and Listening
+def main():
+    connect_to_broker()
+    client.on_message = on_message
+
+    # ✅ Subscribe to MQTT Topics
+    client.subscribe([
+    (station1_request_topic, 0),  # Ensure this topic is included
+    (station1_response_topic, 0),
+    (station3_request_topic, 0),
+    (reset_topic, 0)
+    ])
+    client.loop_start()  # Non-blocking loop to keep listening for messages
+
+    try:
+        print("📡 Waiting for ESP32 requests...")
+        while True:
+            # Optional Manual Control for Reset Triggering
+            choice = input("\nPress 'r' to send a manual reset signal or 'q' to quit: ").strip().lower()
+            if choice == 'r':
+                manual_reset()
+            elif choice == 'q':
+                break
+    except KeyboardInterrupt:
+        print("🔴 Interrupted by user. Disconnecting...")
+    finally:
+        client.disconnect()
+        print("✅ Disconnected from MQTT broker.")
+
+
+# ✅ Run the Main Function
+if __name__ == "__main__":
+    main()
