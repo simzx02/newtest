@@ -1,5 +1,6 @@
 import paho.mqtt.client as mqtt
 import time
+import msvcrt
 
 # MQTT Broker Configuration (Ensure IP matches ESP32 setup)
 broker_address = "172.20.10.11"  # Replace with your ESP32 IP
@@ -72,9 +73,12 @@ def send_station1_response():
         "4": "Spill Solution"
     }
 
+    print("\nEnter feedback for Station 1 (1-4): ", end="", flush=True)
+    
     while True:
-        choice = input("Enter your choice for Station 1 (1-4): ").strip()
+        choice = msvcrt.getch().decode('utf-8')
         if choice in messages:
+            print(f"\n✅ Sent feedback: '{messages[choice]}' to ESP32.")
             client.publish(station1_response_topic, messages[choice])
             print(f"✅ Sent: '{messages[choice]}' to ESP32.")
             break
@@ -97,14 +101,17 @@ def send_station3_feedback():
         "4": "Spill Solution"
     }
 
+    print("\nEnter feedback for Station 3 (1-4): ", end="", flush=True)
+
     while True:
-        choice = input("Enter feedback for Station 3 (1-4): ").strip()
+        choice = msvcrt.getch().decode('utf-8')
         if choice in feedback_map:
+            print(f"\n✅ Sent feedback: '{feedback_map[choice]}' to ESP32.")
             client.publish(station3_response_topic, feedback_map[choice])
-            print(f"✅ Sent feedback: '{feedback_map[choice]}' to ESP32.")
             break
         else:
-            print("⚠️ Invalid choice. Please try again.")
+            print(f"\n⚠️ Invalid choice: {choice}. Please try again.")
+
 
 
 # ✅ Manual Reset Trigger from Python Client
@@ -146,3 +153,4 @@ def main():
 # ✅ Run the Main Function
 if __name__ == "__main__":
     main()
+
