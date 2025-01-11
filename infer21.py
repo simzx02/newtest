@@ -46,7 +46,10 @@ def run_yolo(frame_queue, stop_event):
     model = YOLO("best.pt", task='classify')
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter('output.mp4', fourcc, 5, (320,320))
+    out = cv2.VideoWriter('output.mp4', fourcc, 5, (320, 320))
+
+    # Create a named window for displaying the frames
+    cv2.namedWindow("YOLO Detection", cv2.WINDOW_NORMAL)
 
     while not stop_event.is_set():
         if not frame_queue.empty():
@@ -73,9 +76,20 @@ def run_yolo(frame_queue, stop_event):
                     1,
                     cv2.LINE_AA,
                 )
+
+            # Display the frame with detection results
+            cv2.imshow("YOLO Detection", frame)
+
+            # Write the frame to the output video file
             out.write(frame)
 
+            # Break the loop if 'q' is pressed
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                stop_event.set()
+                break
 
+    # Release the video writer and close the OpenCV window
+    out.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
