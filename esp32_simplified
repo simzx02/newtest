@@ -2,10 +2,10 @@
 #define STATUS_LED1 25
 #define STATUS_LED2 33
 #define STATUS_LED3 32
-#define PNEUMATIC_PC1 17  // Relay 1 (Active LOW)
-#define PNEUMATIC_PC2 16  // Relay 2 (Active LOW)
-#define PNEUMATIC_PC3 4   // Blower (Active LOW)
-#define PNEUMATIC_PC4 2   // Positioner (Active LOW)
+#define PNEUMATIC_PC1 3  // Relay 1 (Active LOW)
+#define PNEUMATIC_PC2 21  // Relay 2 (Active LOW)
+#define PNEUMATIC_PC3 22  // Blower (Active LOW)
+#define PNEUMATIC_PC4 17   // Positioner (Active LOW)
 #define WATER_PUMP 5      // Active LOW
 #define PC1_1 34          
 #define PC1_2 35          
@@ -76,6 +76,9 @@ void loop() {
         Serial.println("✅ Proceeding to Station 2...");
         
         Serial.println("✅ Move for 5s");
+        // ✅ Step 1: Activate PC1 (Engage Initial Pneumatic)
+        digitalWrite(PNEUMATIC_PC1, LOW); // Active LOW relay ON == extending
+        Serial.println("✅ PC1 Activated");
         delay(4000);
     }
 
@@ -86,10 +89,6 @@ void loop() {
         Serial.println("🔧 Station 2: Processing...");
         digitalWrite(STATUS_LED2, HIGH);
         Serial.println("✅ STATUS_LED2 Turned ON");
-
-        // ✅ Step 1: Activate PC1 (Engage Initial Pneumatic)
-        digitalWrite(PNEUMATIC_PC1, LOW); // Active LOW relay ON == extending
-        Serial.println("✅ PC1 Activated");
 
         // Wait for limit switches to reach the correct state
         unsigned long startTime = millis();
@@ -116,10 +115,12 @@ void loop() {
 
         // ✅ Step 5: Activate Water Pump for 3 Seconds
         digitalWrite(WATER_PUMP, HIGH);  // Active LOW relay ON
-        Serial.println("✅ Water Pump Activated for 3 Seconds: Dispensing");
-        delay(3000);  // Water pump runs for 3 seconds
+        Serial.println("✅ Water Pump Activated for 0.15 Second: Dispensing");
+        delay(150);  // Water pump runs 
         digitalWrite(WATER_PUMP, LOW);  // Turn OFF Water Pump
         Serial.println("✅ Water Pump Deactivated");
+        digitalWrite(PNEUMATIC_PC3, HIGH);
+        digitalWrite(PNEUMATIC_PC4, HIGH);
 
         // ✅ Step 6: Reset Actuators (Turn OFF Relays)
         delay(2000);
@@ -128,8 +129,7 @@ void loop() {
           Serial.println("Wait for a moment");
           delay(2000);
         } 
-        digitalWrite(PNEUMATIC_PC3, HIGH);
-        digitalWrite(PNEUMATIC_PC4, HIGH);
+        
         digitalWrite(WATER_PUMP, LOW);
         digitalWrite(STATUS_LED2, LOW);
         digitalWrite(STATUS_LED3, HIGH);
