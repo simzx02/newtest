@@ -1,0 +1,227 @@
+[
+    {
+        "id": "173f6b9867fca085",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "19a581149397959c",
+        "type": "mqtt in",
+        "z": "173f6b9867fca085",
+        "name": "",
+        "topic": "esp32/serial",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "b1b1c1a0.1b1c1",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 210,
+        "y": 160,
+        "wires": [
+            [
+                "2b704192d9cb09c1",
+                "ce941fa5d79ff9f5",
+                "7a896299fdab92d8"
+            ]
+        ]
+    },
+    {
+        "id": "2b704192d9cb09c1",
+        "type": "debug",
+        "z": "173f6b9867fca085",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 520,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "ce941fa5d79ff9f5",
+        "type": "ui_text",
+        "z": "173f6b9867fca085",
+        "group": "g1b1c1a0.1b1c1",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Real-time updates",
+        "format": "{{msg.payload}}",
+        "layout": "col-center",
+        "className": "",
+        "style": false,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "25",
+        "color": "#000000",
+        "x": 550,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "7a896299fdab92d8",
+        "type": "function",
+        "z": "173f6b9867fca085",
+        "name": "function 1",
+        "func": "if (!context.global.messageHistory) {\n    context.global.messageHistory = \"\";\n}\n\n// Append the new message to the history with a newline\ncontext.global.messageHistory += msg.payload + \"\\n\";\nmsg.payload = context.global.messageHistory;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 280,
+        "wires": [
+            [
+                "96a0677678a30d7b",
+                "31aed9838a453126"
+            ]
+        ]
+    },
+    {
+        "id": "96a0677678a30d7b",
+        "type": "debug",
+        "z": "173f6b9867fca085",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 680,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "31aed9838a453126",
+        "type": "ui_template",
+        "z": "173f6b9867fca085",
+        "group": "g1b1c1a0.1b1c1",
+        "name": "",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "format": "<pre><textarea style=\"width: 100%; height: 300px;\">{{msg.payload}}</textarea></pre>\n",
+        "storeOutMessages": false,
+        "fwdInMessages": true,
+        "resendOnRefresh": false,
+        "templateScope": "local",
+        "className": "HTML",
+        "x": 700,
+        "y": 340,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "435e8559da189805",
+        "type": "ui_button",
+        "z": "173f6b9867fca085",
+        "name": "",
+        "group": "g1b1c1a0.1b1c1",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "Clear Message",
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "payload": "clear",
+        "payloadType": "str",
+        "topic": "clear_history",
+        "topicType": "msg",
+        "x": 200,
+        "y": 340,
+        "wires": [
+            [
+                "7a896299fdab92d8",
+                "5b29dbc0c7dff984"
+            ]
+        ]
+    },
+    {
+        "id": "5b29dbc0c7dff984",
+        "type": "function",
+        "z": "173f6b9867fca085",
+        "name": "function 2",
+        "func": "// Check if the button was pressed\nif (msg.payload === \"clear\") {\n    // Clear the message history\n    context.global.messageHistory = \"\";\n    msg.payload = \"Message history cleared.\";\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 480,
+        "y": 340,
+        "wires": [
+            [
+                "31aed9838a453126"
+            ]
+        ]
+    },
+    {
+        "id": "b1b1c1a0.1b1c1",
+        "type": "mqtt-broker",
+        "name": "MQTT Broker",
+        "broker": "172.20.10.11",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "g1b1c1a0.1b1c1",
+        "type": "ui_group",
+        "name": "ESP32 Status",
+        "tab": "b25cc03e611269da",
+        "order": 1,
+        "disp": true,
+        "width": "16",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "b25cc03e611269da",
+        "type": "ui_tab",
+        "name": "Contact Lens Packaging Detector & Optimizer",
+        "icon": "dashboard",
+        "order": 1,
+        "disabled": false,
+        "hidden": false
+    }
+]
