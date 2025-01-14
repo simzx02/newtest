@@ -1,0 +1,278 @@
+#include <WiFi.h>
+#include <PicoMQTT.h>
+
+// Wi-Fi Configuration
+const char* ssid = "iPad";          // Replace with your Wi-Fi SSID
+const char* password = "ggvcryvct";  // Replace with your Wi-Fi password
+
+// Pin Configuration
+#define STATUS_LED1 25
+#define STATUS_LED2 33
+#define STATUS_LED3 32
+#define PNEUMATIC_PC1 3  // Relay 1 (Active LOW)
+#define PNEUMATIC_PC2 21  // Relay 2 (Active LOW)
+#define PNEUMATIC_PC3 22  // Blower (Active LOW)
+#define PNEUMATIC_PC4 17   // Positioner (Active LOW)
+#define WATER_PUMP 5      // Active LOW
+#define PC1_1 34          
+#define PC1_2 35          
+#define PC2_1 19          
+#define PC2_2 18          
+#define RESET_BUTTON 27   // Reset button GPIO 27 (Active LOW)
+
+// State Variables
+bool station1completed = false; // Flag for controlling Station 3 eligibility
+bool station2completed = false;
+bool station3completed = false;
+bool messagesPrinted = false;  // Flag to track if messages have been printed
+
+PicoMQTT::Server mqtt;
+
+// Function to connect to Wi-Fi
+void setupWiFi() {
+    Serial.println("Connecting to Wi-Fi...");
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.println("Connecting...");
+    }
+    Serial.println("Connected to Wi-Fi");
+    Serial.printf("WiFi connected, IP: %s\n", WiFi.localIP().toString().c_str());
+}
+
+void setup() {
+    Serial.begin(115200);
+    setupWiFi();
+
+    // Initialize Pin Modes (your existing setup code)
+    pinMode(STATUS_LED1, OUTPUT);
+    pinMode(STATUS_LED2, OUTPUT);
+    pinMode(STATUS_LED3, OUTPUT);
+    pinMode(PNEUMATIC_PC1, OUTPUT);
+    pinMode(PNEUMATIC_PC2, OUTPUT);
+    pinMode(PNEUMATIC_PC3, OUTPUT);
+    pinMode(PNEUMATIC_PC4, OUTPUT);
+    pinMode(WATER_PUMP, OUTPUT);
+    pinMode(PC1_1, INPUT_PULLUP);
+    pinMode(PC1_2, INPUT_PULLUP);
+    pinMode(PC2_1, INPUT_PULLUP);
+    pinMode(PC2_2, INPUT_PULLUP);
+    pinMode(RESET_BUTTON, INPUT_PULLUP);
+
+    // Set all relays to HIGH (default OFF for Active LOW configuration)
+    digitalWrite(PNEUMATIC_PC1, HIGH);
+    digitalWrite(PNEUMATIC_PC2, LOW); // originally extending
+    digitalWrite(PNEUMATIC_PC3, HIGH);
+    digitalWrite(PNEUMATIC_PC4, HIGH);
+    digitalWrite(WATER_PUMP, LOW); // active high
+    digitalWrite(STATUS_LED1, LOW);
+    digitalWrite(STATUS_LED2, LOW);
+    digitalWrite(STATUS_LED3, LOW);
+
+    // Initialize Reset State
+    resetSystem();
+
+    // Subscribe to a topic pattern and attach a callback
+    mqtt.subscribe("#", [](const char* topic, const char* payload) {
+        Serial.printf("Received message in topic '%s': %s\n", topic, payload);
+    });
+    mqtt.begin();
+}
+void publishRetainedMessage(const char* topic, const char* message, bool retain = true) {
+    mqtt.publish(topic, message, retain); // Pass the retain flag to the MQTT publish function
+}
+
+void loop() {
+    mqtt.loop();
+    delay(3000);
+    // ✅ Real-time Reset Button Check (Active LOW)
+    if (digitalRead(RESET_BUTTON) == LOW) {
+        delay(200);  // Debounce
+        if (digitalRead(RESET_BUTTON) == LOW) {
+            Serial.println("⚠️ Reset Button Pressed! Resetting system...");
+            publishRetainedMessage("esp32/serial", "⚠️ Reset Button Pressed! Resetting system...");
+            resetSystem();
+            return;
+        }
+    }
+
+    // ✅ Station 1 Process
+    if (!station3completed && !station1completed && digitalRead(PC1_1) == HIGH && digitalRead(PC1_2) == LOW) {
+        Serial.println("🔧 Station 1: Processing...");
+        publishRetainedMessage("esp32/serial", "🔧 Station 1: Processing...");
+        digitalWrite(STATUS_LED1, HIGH);
+        Serial.println("✅ STATUS_LED1 Turned ON");
+        publishRetainedMessage("esp32/serial", "✅ STATUS_LED1 Turned ON");
+        delay(2000);
+        station1completed = true;
+        // Proceed to Station 2
+        Serial.println("✅ Proceeding to Station 2...");
+        publishRetainedMessage("esp32/serial", "✅ Proceeding to Station 2...");
+        delay(1000);
+        Serial.println("✅ Move for 5s");
+        publishRetainedMessage("esp32/serial", "✅ Move for 5s");
+        // ✅ Step 1: Activate PC1 (Engage Initial Pneumatic)
+        digitalWrite(PNEUMATIC_PC1, LOW); // Active LOW relay ON == extending
+        Serial.println("✅ PC1 Activated");
+        publishRetainedMessage("esp32/serial", "✅ PC1 Activated");
+        delay(4000);
+    }
+
+    // ✅ Station 2 Process
+    if (station1completed && !station3completed && digitalRead(PC1_1) == LOW && digitalRead(PC1_2) == HIGH) {
+        digitalWrite(STATUS_LED1, LOW);
+        Serial.println("✅ STATUS_LED1 Turned OFF");
+        publishRetainedMessage("esp32/serial", "✅ STATUS_LED1 Turned OFF");
+        delay(500);
+        Serial.println("🔧 Station 2: Processing...");
+        publishRetainedMessage("esp32/serial", "🔧 Station 2: Processing...");
+        delay(500);
+        digitalWrite(STATUS_LED2, HIGH);
+        Serial.println("✅ STATUS_LED2 Turned ON");
+        publishRetainedMessage("esp32/serial", "✅ STATUS_LED2 Turned ON");
+        delay(300);
+
+        // Wait for limit switches to reach the correct state
+        unsigned long startTime = millis();
+        while (!(digitalRead(PC1_1) == LOW && digitalRead(PC1_2) == HIGH)) {
+            if (millis() - startTime > 10000) { // Timeout after 10 seconds
+                Serial.println("⚠️ Timeout waiting for Station 2 positioning.");
+                publishRetainedMessage("esp32/serial", "⚠️ Timeout waiting for Station 2 positioning.");
+                break;
+            }
+            delay(100);
+        }
+
+        // ✅ Step 3: Deactivate PC2 Once PC1_2 is Triggered
+        digitalWrite(PNEUMATIC_PC2, HIGH); // Active LOW relay OFF
+        Serial.println("✅ PC2 Retracts");
+        publishRetainedMessage("esp32/serial", "✅ PC2 Retracts");
+        delay(200);
+        while (!(digitalRead(PC2_1) == LOW && digitalRead(PC2_2) == HIGH)){
+          Serial.println("Wait for a moment");
+          publishRetainedMessage("esp32/serial", "Wait for a moment");
+          delay(2000);
+        } 
+
+        // ✅ Step 4: Activate Positioner (PC3, PC4)
+        
+        digitalWrite(PNEUMATIC_PC4, LOW);  // Positioner ON
+        Serial.println("✅ Positioner Activated");
+        publishRetainedMessage("esp32/serial", "✅Positioner Activated");
+        delay(500);
+
+        // ✅ Step 5: Activate Water Pump for 3 Seconds
+        digitalWrite(WATER_PUMP, HIGH);  // Active LOW relay ON
+        Serial.println("✅ Water Pump Activated for 0.15 Second: Dispensing");
+        publishRetainedMessage("esp32/serial", "✅ Water Pump Activated for 0.4 Second: Dispensing");
+        delay(100);  // Water pump runs 
+        digitalWrite(WATER_PUMP, LOW);  // Turn OFF Water Pump
+        Serial.println("✅ Water Pump Deactivated");
+        publishRetainedMessage("esp32/serial", "✅ Water Pump Deactivated");
+        delay(500);
+        digitalWrite(PNEUMATIC_PC3, LOW);  // Blower ON
+        Serial.println("✅ Blower Activated");
+        publishRetainedMessage("esp32/serial", "✅Blower Activated");
+        delay(2000);
+        digitalWrite(PNEUMATIC_PC3, HIGH);
+        digitalWrite(PNEUMATIC_PC4, HIGH);
+
+        // ✅ Step 6: Reset Actuators (Turn OFF Relays)
+        delay(2000);
+        digitalWrite(PNEUMATIC_PC2, LOW);
+        while (!(digitalRead(PC2_1) == HIGH && digitalRead(PC2_2) == LOW)){
+          Serial.println("Wait for a moment");
+          publishRetainedMessage("esp32/serial", "Wait for a moment");
+          delay(2000);
+        } 
+        
+        digitalWrite(WATER_PUMP, LOW);
+        digitalWrite(STATUS_LED2, LOW);
+        digitalWrite(STATUS_LED3, HIGH);
+        Serial.println("✅ Station 2 Process Completed");
+        publishRetainedMessage("esp32/serial", "✅ Station 2 Process Completed");
+        station2completed = true;
+        //station1completed = false; // Reset Station 1 flag after Station 2 completes
+        digitalWrite(PNEUMATIC_PC1, HIGH);
+        Serial.println("✅ Move to Station 3...");
+        publishRetainedMessage("esp32/serial", "✅ Move to Station 3...");
+        delay(3000);
+    }
+
+    // ✅ Holding Condition Before Station 3 (Using While Loop)
+    unsigned long startTime = millis();
+    while (station2completed && !station3completed && !(digitalRead(PC1_1) == HIGH && digitalRead(PC1_2) == LOW)) {
+        if (millis() - startTime > 10000) { // Timeout after 10 seconds
+            Serial.println("⚠️ Timeout waiting for Station 3 positioning.");
+            publishRetainedMessage("esp32/serial", "⚠️ Timeout waiting for Station 3 positioning.");
+            break;
+        }
+        delay(1000);  // Wait for 1 second before checking again
+    }
+
+    // ✅ Condition Met, Moving to Station 3 Process
+    if (station1completed && station2completed && !station3completed && digitalRead(PC1_1) == HIGH && digitalRead(PC1_2) == LOW) {
+        
+        Serial.println("🔧 Station 3: Processing...");
+        publishRetainedMessage("esp32/serial", "🔧 Station 3: Processing...");
+
+        // Simulate Station 3 completion
+        delay(5000);  // Simulate processing time
+        digitalWrite(STATUS_LED3, LOW);
+        //station2Completed = false;
+        station3completed = true;
+        Serial.println("✅ Station 3 Process Completed");
+        publishRetainedMessage("esp32/serial", "✅ Station 3 Process Completed");
+
+    }
+    
+
+      while (station1completed && station2completed && station3completed) {
+          if (!messagesPrinted) {
+              Serial.println("✅ Overall Process Completed");
+              publishRetainedMessage("esp32/serial", "✅ Overall Process Completed");
+              Serial.println("Press 🔄Reset🔄 to restart system");
+              publishRetainedMessage("esp32/serial", "Press 🔄Reset🔄 to restart system");
+              messagesPrinted = true;  // Set the flag to true after printing
+          }
+
+          delay(100);  // Small delay to debounce and reduce CPU usage
+
+          if (digitalRead(RESET_BUTTON) == LOW) {
+              delay(200);  // Debounce
+              if (digitalRead(RESET_BUTTON) == LOW) {
+                  Serial.println("⚠️ Reset Button Pressed! Resetting system...");
+                  publishRetainedMessage("esp32/serial", "⚠️ Reset Button Pressed! Resetting system...");
+                  resetSystem();
+                  return;
+              }
+          }
+      }
+      mqtt.loop();
+}
+
+// ✅ Reset System Function
+void resetSystem() {
+    Serial.println("🔄 Resetting System...");
+    publishRetainedMessage("esp32/serial", "🔄 Resetting System...");
+
+    // Set all relays to default OFF (Active LOW relays)
+    digitalWrite(PNEUMATIC_PC1, HIGH);
+    digitalWrite(PNEUMATIC_PC2, LOW);
+    digitalWrite(PNEUMATIC_PC3, HIGH);
+    digitalWrite(PNEUMATIC_PC4, HIGH);
+    digitalWrite(WATER_PUMP, LOW);
+
+    // Reset LEDs and State Variables
+    digitalWrite(STATUS_LED1, LOW);
+    digitalWrite(STATUS_LED2, LOW);
+    digitalWrite(STATUS_LED3, LOW);
+    station1completed = false;
+    station2completed = false;
+    station3completed = false;
+    messagesPrinted = false;
+
+    Serial.println("✅ System Ready for New Cycle.");
+    publishRetainedMessage("esp32/serial", "✅ System Ready for New Cycle.");
+    delay(2000);
+}
