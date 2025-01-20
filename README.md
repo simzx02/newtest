@@ -7,3 +7,6 @@
 
 ## Handout for circuit connections
 ![image](https://github.com/user-attachments/assets/e0105891-1a9d-44d7-b566-c673753f89b2)
+
+## Red node simplified dashboard for status checking
+![image](https://github.com/user-attachments/assets/fa802825-99c6-4759-8859-ebc462bfe584)
