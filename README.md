@@ -10,3 +10,7 @@
 
 ## Red node simplified dashboard for status checking
 ![image](https://github.com/user-attachments/assets/fa802825-99c6-4759-8859-ebc462bfe584)
+
+## Youtube link
+Conceptual Video: https://youtu.be/oQbxu4uqMB0
+Final Prototype Video: https://youtu.be/4r0NZ3TAAQk 
